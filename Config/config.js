@@ -3,10 +3,10 @@ require("dotenv").config();
 
 // Create a Promise-based pool
 const connection = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASS,
-  database: process.env.DB_NAME,
+  host: process.env.DB_HOST || "139.59.56.128",
+  user: process.env.DB_USER || "ahamat",
+  password: process.env.DB_PASS || "AtelierCreation@2019A",
+  database: process.env.DB_NAME || "ahamat",
   waitForConnections: true,
   connectionLimit: 10, 
   queueLimit: 0
