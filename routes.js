@@ -431,8 +431,6 @@ router.put('/profile/:id',
         const userId = req.params.id;
         let updatedFields = { ...req.body };
 
-        // Debugging logs to verify file upload structure
-        console.log("Uploaded files:", req.files);
 
         // Check if files are uploaded and handle each one safely
         if (req.files?.image_1 && req.files.image_1[0]?.path) {
