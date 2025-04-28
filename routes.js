@@ -424,30 +424,37 @@ router.get('/view-profile/:id', async (req, res) => {
 });
 
 
-router.put('/profile/:id', upload.fields([
-  { name: 'image_1', maxCount: 1 },
-  { name: 'image_2', maxCount: 1 }
-]), async (req, res) => {
-  try {
-      const userId = req.params.id;
-      const updatedFields = req.body; // normal fields (name, age, etc.)
+router.put('/profile/:id', 
+  upload.fields([{ name: "image_1" }, { name: "image_2" }]), 
+  async (req, res) => {
+    try {
+        const userId = req.params.id;
+        let updatedFields = { ...req.body };
 
-      // Handle uploaded files
-      if (req.files.image_1) {
-          updatedFields.image_1 = req.files.image_1[0].filename;
-      }
-      if (req.files.image_2) {
-          updatedFields.image_2 = req.files.image_2[0].filename;
-      }
+        // Check if files are uploaded
+        if (req.files?.image_1 && req.files.image_1[0]?.path) {
+            updatedFields.image_1 = req.files.image_1[0].path.replace('uploads\\', 'uploads/'); // Convert path to use forward slashes
+        }
 
-      const result = await updateProfile(userId, updatedFields);
+        if (req.files?.image_2 && req.files.image_2[0]?.path) {
+            updatedFields.image_2 = req.files.image_2[0].path.replace('uploads\\', 'uploads/');
+        }
 
-      res.status(200).json({ message: "Profile updated successfully", result });
-  } catch (err) {
-      console.error(err);
-      res.status(500).json({ message: err.message });
-  }
+        // Perform the update operation
+        const result = await updateProfile(userId, updatedFields);
+
+        if (result.result.affectedRows > 0) {
+               return res.status(200).json({  status: 200, message: "Profile updated successfully", data: result });
+        } else {
+            return res.status(404).json({ message: "No changes detected or profile not updated" });
+        }
+
+    } catch (err) {
+        console.error("Error updating profile:", err);
+        res.status(500).json({ message: "Error updating profile", error: err.message });
+    }
 });
+
 
 // router.post("/like-profile", (req, res) => {
 //     const { user_liked_id } = req.body;

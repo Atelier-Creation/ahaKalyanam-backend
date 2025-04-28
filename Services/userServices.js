@@ -8,30 +8,37 @@ require("dotenv").config(); // Load .env variables
 
 
 
-
 const updateUserDetails = async (userId, updatedFields) => {
   try {
-    // updatedFields.updated_at = new Date(); 
+    if (!userId || Object.keys(updatedFields).length === 0) {
+      throw new Error("User ID and updated fields are required.");
+    }
 
-    // Update user details  
-    const result = await User.update(updatedFields, {
-      where: { user_id: userId },
-    });
+    const setClause = Object.keys(updatedFields)
+      .map(field => `${field} = ?`)
+      .join(', ');
+    const values = [...Object.values(updatedFields), userId];
+
+    const query = `UPDATE users SET ${setClause} WHERE user_id = ?`;
+
+    const [result] = await connection.execute(query, values);
 
     console.log('Result:', result);
 
-    if (result[0] === 0) {
+    if (result.affectedRows === 0) {
       console.log('❌ No user updated. Check the user ID.');
       return { result: false, message: 'User not found' };
     }
 
     console.log('✅ User updated successfully!');
     return { result: true, message: 'User updated successfully' };
+
   } catch (error) {
-    console.error('❌ Error updating user:', error);
-    return { result: false, message: 'Error updating user' };
+    console.error('❌ Error updating user:', error.message);
+    return { result: false, message: 'Error updating user', error: error.message };
   }
 };
+
 
 const getQuickSearch = async (gender, min_age, max_age, religion, caste, sub_caste, marital_status) => {
   const QUICK_SEARCH = `
@@ -45,153 +52,124 @@ const getQuickSearch = async (gender, min_age, max_age, religion, caste, sub_cas
       AND (? IS NULL OR marital_status = ?)
   `;
 
-  console.log("This is a quick search function!");
-  console.log(gender, min_age, max_age, religion, caste, sub_caste, marital_status);
+  try {
+    const [results] = await connection.execute(QUICK_SEARCH, [
+      gender, gender,
+      min_age, min_age,
+      max_age, max_age,
+      religion, religion,
+      caste, caste,
+      sub_caste, sub_caste,
+      marital_status, marital_status
+    ]);
 
-  return new Promise((resolve, reject) => {
-      connection.query(
-          QUICK_SEARCH, 
-          [
-            gender, gender,
-            min_age, min_age,
-            max_age, max_age,
-            religion, religion,
-            caste, caste,
-            sub_caste, sub_caste,
-            marital_status, marital_status
-          ], // ✅ Fixed missing min_age & max_age
-          (err, results) => {
-              if (err) {
-                  return reject({ status: 500, error: "Database error" }); // ✅ Fixed `status_is`
-              }
+    if (results.length === 0) {
+      return {
+        status: 401,
+        message: "No profile found for this filter"
+      };
+    }
 
-              if (results.length === 0) {
-                reject({
-                  status: 401,
-                  message: "No profile found for this filter",
-              }); // ✅ Better error message
-              }
+    return {
+      status: 200,
+      message: "Quick search results",
+      data: results
+    };
 
-              resolve({
-                  status: 200,
-                  message: "Quick search results",
-                  data: results
-              });
-          }
-      );
-  });
+  } catch (error) {
+    console.error('❌ Error in quick search:', error.message);
+    return {
+      status: 500,
+      message: "Database error",
+      error: error.message
+    };
+  }
 };
 
 
 
 
 const loginCheck = async (email, password) => {
+  const LOGIN_USER = `SELECT * FROM users WHERE mail_id = ?`;
 
-    const LOGIN_USER = `SELECT * FROM users WHERE mail_id = ?`;
-    console.log("The error is: ", password);
-    
-    return new Promise((resolve, reject) => {
-      connection.query(LOGIN_USER, [email], async (err, results) => {
-        if (err) {
-          return reject({ status: 500, error: 'Database error' });
-        }
-  
-          if (results.length === 0) {
-          return reject({ status: 401, error: 'Invalid email or account deactivated' });
-        }
-  
-        const user = results[0];
-  
-        try {
-          const isMatch = await bcrypt.compare(password, user.password);
-          if (!isMatch) {
-            return reject({ status: 401, error: 'Invalid email or password' });
-          }
+  try {
+    const [results] = await connection.execute(LOGIN_USER, [email]);
 
-          console.log(user);
-          console.log(process.env.JWT_SECRET);
-
-
-          const token = jwt.sign(
-            { user_id: user.id, role: user.role },  // Payload
-            process.env.JWT_SECRET,                 // Secret Key (should be stored securely)
-            { expiresIn: '6h' }                     // Options (expiry time, etc.)
-        );
-        console.log("The token is: ", token);
-  
-          resolve({
-            status: 200,
-            message: 'Login successful',
-            token: token
-          });
-  
-        } catch (error) {
-          reject({ status: 500, error: 'Server error' });
-        }
-      });
-    });
-  };
-
-
-  const 
-  createUser = async (name, email, phone, password, gender) => {
-
-    const role = gender === "Female" ? "moderator" : "user";
-
-    const CREATE_USER = `
-INSERT INTO users (name, mail_id, password, phone, register_number, gender, role)
-VALUES (?, ?, ?, ?, 
-  CONCAT('REG-', UPPER(SUBSTRING(MD5(RAND()), 1, 6))), 
-  ?, ?);
-`;
-
-
-    const SELECT_USER = `SELECT * FROM users WHERE mail_id = ?`;
-
-    try {
-        const hashedPassword = await bcrypt.hash(password, 10); // ✅ Hash password correctly
-
-        return new Promise((resolve, reject) => {
-            connection.query(CREATE_USER, [name, email, hashedPassword, phone, gender, role], (err, result) => {
-                if (err) {
-                    reject(new Error('Error inserting data: ' + err.message)); // ✅ Improved error handling
-                } else {
-                    const userId = result.insertId;
-                    connection.query(SELECT_USER, [email], (err, user_role_result) => {
-                        if (err) {
-                            reject(new Error('Error fetching user data: ' + err.message));
-                        } else {
-
-
-                          const user = user_role_result[0];
-
-                          console.log(user.id);
-                          console.log(user.role);
-
-                          
-                          const token = jwt.sign(
-                            { user_id: user.id, 
-                              role: user.role },  // Payload
-                            process.env.JWT_SECRET,                 // Secret Key (should be stored securely)
-                            { expiresIn: '6h' }                     // Options (expiry time, etc.)
-                        );
-                          
-                            resolve({
-                                status: 200,
-                                message: 'User registered successfully!',
-                                token: token,
-                                user_id: user.id,
-                            });
-                        }
-                    });
-                }
-            });
-        });
-
-    } catch (err) {
-        throw new Error('Error hashing password: ' + err.message);
+    if (results.length === 0) {
+      return { status: 401, error: 'Invalid email or account deactivated' };
     }
+
+    const user = results[0];
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return { status: 401, error: 'Invalid email or password' };
+    }
+
+    const token = jwt.sign(
+      { user_id: user.id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '6h' }
+    );
+
+    return {
+      status: 200,
+      message: 'Login successful',
+      token: token
+    };
+
+  } catch (error) {
+    console.error('❌ Error during login:', error.message);
+    return { status: 500, error: 'Server error' };
+  }
 };
+
+
+
+const createUser = async (name, email, phone, password, gender) => {
+  const role = gender === "Female" ? "moderator" : "user";
+  
+  const CREATE_USER = `
+    INSERT INTO users (name, mail_id, password, phone, register_number, gender, role)
+    VALUES (?, ?, ?, ?, 
+      CONCAT('REG-', UPPER(SUBSTRING(MD5(RAND()), 1, 6))), 
+      ?, ?);
+  `;
+
+  const SELECT_USER = `SELECT * FROM users WHERE mail_id = ?`;
+
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const [result] = await connection.execute(CREATE_USER, [
+      name, email, hashedPassword, phone, gender, role
+    ]);
+
+    const [user] = await connection.execute(SELECT_USER, [email]);
+
+    if (!user || user.length === 0) {
+      throw new Error("User creation failed or user not found after registration.");
+    }
+
+    const token = jwt.sign(
+      { user_id: user[0].id, role: user[0].role },
+      process.env.JWT_SECRET,
+      { expiresIn: '6h' }
+    );
+
+    return {
+      status: 200,
+      message: 'User registered successfully!',
+      token: token,
+      user_id: user[0].id,
+    };
+
+  } catch (err) {
+    console.error('❌ Error during user creation:', err.message);
+    throw new Error('Error during user creation: ' + err.message);
+  }
+};
+
 
 
 
@@ -200,84 +178,84 @@ const getAllProfile = async () => {
   const GET_ALL_USERS = `SELECT * FROM user_profiles;`;
 
   try {
-      const users = await new Promise((resolve, reject) => {
-          connection.query(GET_ALL_USERS, (err, result) => {
-              if (err) {
-                  reject(new Error("Error fetching users: " + err.message));
-              } else {
-                  resolve(result); // Return fetched users
-              }
-          });
-      });
+    const [users] = await connection.execute(GET_ALL_USERS);  // Using await with execute
 
-      return users; // Return users instead of using `res`
+    if (users.length === 0) {
+      throw new Error("No users found.");
+    }
+
+    return users;
   } catch (err) {
-      throw new Error(err.message); // Throw error so it can be caught in the route handler
+    console.error("❌ Error fetching users:", err.message);
+    throw new Error("Error fetching users: " + err.message);
   }
 };
 
 
 
 
-  const getProfile = async (register_id) => {
-    console.log("This is log function");
-    const GET_USER_PROFILE = `SELECT * FROM user_profiles WHERE id = ?`;
+const getProfile = async (register_id) => {
+  const GET_USER_PROFILE = `SELECT * FROM user_profiles WHERE id = ?`;
 
-    return new Promise((resolve, reject) => {
-        connection.query(GET_USER_PROFILE, [register_id], (err, result) => {
-            if (err) {
-                reject(new Error("Error fetching user: " + err));
-            } else if (result.length === 0) {
-                reject(new Error("User not found"));
-            } else {
-                resolve(result[0]); // Return first matching user
-            }
-        });
-    });
+  try {
+    const [result] = await connection.execute(GET_USER_PROFILE, [register_id]);
+
+    if (result.length === 0) {
+      throw new Error("User not found");
+    }
+
+    return result[0]; // Return the first matching user
+  } catch (err) {
+    console.error("❌ Error fetching user:", err.message);
+    throw new Error("Error fetching user: " + err.message);
+  }
 };
 
 
 const getViewProfile = async (register_id) => {
-  console.log("This is log function");
   const GET_USER_PROFILE = `
-  SELECT 
-    up.*, 
-    u.mail_id, 
-    u.password,
-    u.role
-  FROM user_profiles up
-  JOIN users u ON up.linked_to = u.id
-  WHERE up.id = ?;
-`;
-  return new Promise((resolve, reject) => {
-      connection.query(GET_USER_PROFILE, [register_id], (err, result) => {
-          if (err) {
-              reject(new Error("Error fetching user: " + err));
-          } else if (result.length === 0) {
-              reject(new Error("User not found"));
-          } else {
-              resolve(result[0]); // Return first matching user
-          }
-      });
-  });
+    SELECT 
+      up.*, 
+      u.mail_id, 
+      u.password,
+      u.role
+    FROM user_profiles up
+    JOIN users u ON up.linked_to = u.id
+    WHERE up.id = ?;
+  `;
+
+  try {
+    const [result] = await connection.execute(GET_USER_PROFILE, [register_id]);
+
+    if (result.length === 0) {
+      throw new Error("User not found");
+    }
+
+    return result[0]; // Return the first matching user
+  } catch (err) {
+    console.error("❌ Error fetching user:", err.message);
+    throw new Error("Error fetching user: " + err.message);
+  }
 };
 
 
-const resetUserPassword = (user_id, new_password_hash) => {
+const resetUserPassword = async (user_id, new_password_hash) => {
   const RESET_PASSWORD_QUERY = "UPDATE users SET password = ? WHERE mail_id = ?";
 
-  return new Promise((resolve, reject) => {
-    connection.query(RESET_PASSWORD_QUERY, [new_password_hash, user_id], (error, results) => {
-      if (error) {
-        reject({ success: false, message: "Error resetting password", error });
-      } else if (results.affectedRows === 0) {
-        reject({ success: false, message: "User not found" });
-      } else {
-        resolve({ success: true, message: "Password reset successfully" });
-      }
-    });
-  });
+  try {
+    const [results] = await connection.execute(RESET_PASSWORD_QUERY, [new_password_hash, user_id]);
+
+    if (results.affectedRows === 0) {
+      throw new Error("User not found");
+    }
+
+    return { success: true, message: "Password reset successfully" };
+  } catch (error) {
+    console.error("❌ Error resetting password:", error.message);
+    throw { success: false, message: "Error resetting password", error };
+  }
 };
+
 
 
 
@@ -301,30 +279,56 @@ const addUserInterests = async (user_id, liked_profile_id) => {
 
 
 const updateProfile = async (userId, updatedFields) => {
-  console.log("This is log function");
-  const validFields = Object.keys(updatedFields).filter(field => updatedFields[field] !== undefined);
 
-  console.log("The valid fields are: ", userId);
-  
+  const validFields = Object.keys(updatedFields).filter(field => {
+    return updatedFields[field] !== undefined && updatedFields[field] !== null && updatedFields[field] !== '';
+  });
+
+
   if (validFields.length === 0) {
-      throw new Error("No valid fields provided for update.");
+
+    throw new Error("No valid fields provided for update.");
   }
 
+  // Handle potential array values and empty strings for numeric fields
+  validFields.forEach(field => {
+    if (Array.isArray(updatedFields[field])) {
+      updatedFields[field] = updatedFields[field][0];  // Take the first element if it's an array
+    }
+
+    // Set empty strings to null for numeric fields like income and height
+    if ((field === 'income_per_month' || field === 'partner_income' || field === 'weight' || field === 'height') && updatedFields[field] === '') {
+      updatedFields[field] = null;
+    }
+
+    if (field === 'horoscope_required') {
+      updatedFields[field] = updatedFields[field] === 'Must' ? 1 : 0;  // Convert 'Must' to 1, otherwise 0
+    }
+  });
+
+  // Prepare SQL query
   const updateQuery = `UPDATE user_profiles SET ${validFields.map(field => `${field} = ?`).join(', ')} WHERE linked_to = ?`;
+
+  // Prepare values for the query (the valid fields + userId)
   const values = [...validFields.map(field => updatedFields[field]), userId];
 
-  return new Promise((resolve, reject) => {
-      connection.query(updateQuery, values, (err, result) => {
-          if (err) {
-              reject(new Error("Error updating user profile: " + err));
-          } else if (result.affectedRows === 0) {
-              reject(new Error("User not found or no changes made."));
-          } else {
-              resolve({ userId, updatedFields });
-          }
-      });
-  });
+
+  try {
+    const [result] = await connection.execute(updateQuery, values);
+
+    if (result.affectedRows === 0) {
+      throw new Error("No rows affected. User not found or no changes made.");
+    }
+    return { userId, updatedFields, result};
+  } catch (error) {
+    console.error("Error updating user profile:", error.message); 
+    throw new Error("Error updating user profile: " + error.message);
+  }
 };
+
+
+
+
 
 
 module.exports = { updateUserDetails, loginCheck, createUser, resetUserPassword, getAllProfile, getProfile, getViewProfile, updateProfile, addUserInterests, getQuickSearch};

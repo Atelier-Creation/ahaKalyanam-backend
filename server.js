@@ -10,15 +10,20 @@ const path = require('path');
 
 
 const app = express();
-app.use(cors());
 
-
+const corsOptions = {
+  origin: '*',  // Allow all origins, or specify a domain here
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+app.use(cors(corsOptions));
 
 const uploadsDir = path.join('D:', 'erpx-TMS', 'backend', 'uploads');  // The absolute path to the uploads folder
 
 app.use('/uploads', express.static(uploadsDir, {
   setHeaders: (res, path) => {
     res.setHeader('Access-Control-Allow-Origin', '*'); // allow from all origins
+    res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
   }
 }));
 // Middleware to parse JSON bodies

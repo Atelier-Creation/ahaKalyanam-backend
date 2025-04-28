@@ -1,25 +1,50 @@
-const mysql = require('mysql2');
+const mysql = require('mysql2/promise');
 require("dotenv").config();
-const { Sequelize, DataTypes } = require('sequelize');
 
-
-
-const connection = mysql.createConnection({
-  host:"139.59.56.128",
-  user:"ahamat",
-  password: "AtelierCreation@2019A",
-  database: "ahamat"
+// Create a Promise-based pool
+const connection = mysql.createPool({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASS,
+  database: process.env.DB_NAME,
+  waitForConnections: true,
+  connectionLimit: 10, 
+  queueLimit: 0
 });
 
+// Retry logic to reconnect if the initial connection fails
+const handleReconnect = async (retries, delay) => {
+  let attempts = 0;
 
-connection.connect((err) => {
-  if (err) {
-    console.error('Error connecting to the database:', err.stack);
-    return;
+  while (attempts < retries) {
+    try {
+      console.log(`Attempting to connect to the database... (Attempt ${attempts + 1} of ${retries})`);
+      
+      // Try executing a simple query to check the connection
+      await connection.execute('SELECT 1');
+      console.log('Database connection successful!');
+      return; // Exit the loop if connection is successful
+    } catch (error) {
+      console.error('Error connecting to the database:', error.message);
+
+      if (attempts >= retries - 1) {
+        console.error('Max retries reached, unable to connect to the database.');
+        process.exit(1); // Exit if max retries are reached
+      }
+
+      // Retry after delay
+      attempts++;
+      console.log(`Retrying in ${delay}ms...`);
+      await new Promise(res => setTimeout(res, delay)); // Wait for delay
+    }
   }
-  console.log('Connected to the database');
-});
+};
 
+// Test database connection with retry mechanism
+const testConnection = async () => {
+  await handleReconnect(5, 2000); // Retry 5 times with a 2-second delay between each retry
+};
 
+testConnection();
 
-module.exports = connection; //Export the connection to be used in other files.       
+module.exports = connection;
