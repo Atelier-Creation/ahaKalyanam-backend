@@ -431,20 +431,33 @@ router.put('/profile/:id',
         const userId = req.params.id;
         let updatedFields = { ...req.body };
 
-        // Check if files are uploaded
+        // Debugging logs to verify file upload structure
+        console.log("Uploaded files:", req.files);
+
+        // Check if files are uploaded and handle each one safely
         if (req.files?.image_1 && req.files.image_1[0]?.path) {
-            updatedFields.image_1 = req.files.image_1[0].path.replace('uploads\\', 'uploads/'); // Convert path to use forward slashes
+            const newImagePath1 = req.files.image_1[0].path.replace('uploads\\', 'uploads/');
+            
+            // Only update if it's a new image or not previously assigned
+            if (updatedFields.image_1 !== newImagePath1) {
+                updatedFields.image_1 = newImagePath1;
+            }
         }
 
         if (req.files?.image_2 && req.files.image_2[0]?.path) {
-            updatedFields.image_2 = req.files.image_2[0].path.replace('uploads\\', 'uploads/');
+            const newImagePath2 = req.files.image_2[0].path.replace('uploads\\', 'uploads/');
+            
+            // Only update if it's a new image or not previously assigned
+            if (updatedFields.image_2 !== newImagePath2) {
+                updatedFields.image_2 = newImagePath2;
+            }
         }
 
         // Perform the update operation
         const result = await updateProfile(userId, updatedFields);
 
         if (result.result.affectedRows > 0) {
-               return res.status(200).json({  status: 200, message: "Profile updated successfully", data: result });
+            return res.status(200).json({ status: 200, message: "Profile updated successfully", data: result });
         } else {
             return res.status(404).json({ message: "No changes detected or profile not updated" });
         }
@@ -454,6 +467,7 @@ router.put('/profile/:id',
         res.status(500).json({ message: "Error updating profile", error: err.message });
     }
 });
+
 
 
 // router.post("/like-profile", (req, res) => {

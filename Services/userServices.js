@@ -194,6 +194,7 @@ const getAllProfile = async () => {
 
 
 
+
 const getProfile = async (register_id) => {
   const GET_USER_PROFILE = `SELECT * FROM user_profiles WHERE id = ?`;
 
@@ -210,7 +211,22 @@ const getProfile = async (register_id) => {
     throw new Error("Error fetching user: " + err.message);
   }
 };
+const getProfileById = async (register_id) => {
+  const GET_USER_PROFILE = `SELECT * FROM user_profiles WHERE linked_to = ?`;
 
+  try {
+    const [result] = await connection.execute(GET_USER_PROFILE, [register_id]);
+
+    if (result.length === 0) {
+      throw new Error("User not found");
+    }
+
+    return result[0]; // Return the first matching user
+  } catch (err) {
+    console.error("❌ Error fetching user:", err.message);
+    throw new Error("Error fetching user: " + err.message);
+  }
+};
 
 const getViewProfile = async (register_id) => {
   const GET_USER_PROFILE = `
@@ -331,4 +347,4 @@ const updateProfile = async (userId, updatedFields) => {
 
 
 
-module.exports = { updateUserDetails, loginCheck, createUser, resetUserPassword, getAllProfile, getProfile, getViewProfile, updateProfile, addUserInterests, getQuickSearch};
+module.exports = { updateUserDetails, loginCheck, createUser,getProfileById, resetUserPassword, getAllProfile, getProfile, getViewProfile, updateProfile, addUserInterests, getQuickSearch};
