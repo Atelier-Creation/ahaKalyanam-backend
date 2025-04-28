@@ -9,7 +9,8 @@ const connection = mysql.createPool({
   database: process.env.DB_NAME || "ahamat",
   waitForConnections: true,
   connectionLimit: 10, 
-  queueLimit: 0
+  queueLimit: 0,
+  connectTimeout: 10000,
 });
 
 // Retry logic to reconnect if the initial connection fails
