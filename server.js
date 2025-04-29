@@ -25,10 +25,6 @@ app.use('/uploads', express.static(uploadsDir, {
 app.use(bodyParser.json());
 app.use(express.json()); 
 
-app.use((req, res, next) => {
-  console.log(`📥 Incoming ${req.method} request to ${req.path}`);
-  next();
-});
 // Use the routes defined in routes.js
 app.use('/api', routes); 
 

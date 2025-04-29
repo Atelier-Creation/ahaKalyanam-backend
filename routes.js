@@ -85,26 +85,24 @@ router.post(
 );
 
 // Promote user to moderator based on register number
-router.post("/promote-to-moderator", (req, res) => {
+router.post("/promote-to-moderator", async (req, res) => {
   const { register_number } = req.body;
 
   if (!register_number) {
     return res.status(400).send({ error: "Register number is required" });
   }
 
-  const SELECT_USER = `SELECT * FROM users WHERE id = ?`;
-  const UPDATE_ROLE = `UPDATE users SET role = 'moderator' WHERE id = ?`;
+  try {
+    const [users] = await connection.execute(
+      `SELECT * FROM users WHERE id = ?`,
+      [register_number]
+    );
 
-  connection.query(SELECT_USER, [register_number], (err, results) => {
-    if (err) {
-      return res.status(500).send({ error: "Database error: " + err.message });
-    }
-
-    if (results.length === 0) {
+    if (users.length === 0) {
       return res.status(404).send({ error: "User not found" });
     }
 
-    const user = results[0];
+    const user = users[0];
 
     if (user.role === "moderator") {
       return res.status(200).send({ message: "User is already a moderator" });
@@ -116,20 +114,17 @@ router.post("/promote-to-moderator", (req, res) => {
         .send({ message: "Only users can be promoted to moderators" });
     }
 
-    connection.query(UPDATE_ROLE, [register_number], (err, result) => {
-      if (err) {
-        return res
-          .status(500)
-          .send({ error: "Error updating role: " + err.message });
-      }
+    await connection.execute(
+      `UPDATE users SET role = 'moderator' WHERE id = ?`,
+      [register_number]
+    );
 
-      res
-        .status(200)
-        .send({
-          message: `User with register number ${register_number} has been promoted to moderator.`,
-        });
+    return res.status(200).send({
+      message: `User with register number ${register_number} has been promoted to moderator.`,
     });
-  });
+  } catch (err) {
+    return res.status(500).send({ error: "Database error: " + err.message });
+  }
 });
 
 router.post("/createUser", (req, res) => {
@@ -153,8 +148,8 @@ router.post(
   authorizeRoles("moderator", "admin"),
   upload.fields([{ name: "image_1" }, { name: "image_2" }]),
   async (req, res) => {
-    console.log("Uploaded Files:", req.files);
-    console.log("Request Body:", req.body);
+    // console.log("Uploaded Files:", req.files);
+    // console.log("Request Body:", req.body);
 
     try {
       const cleanedBody = Object.fromEntries(
