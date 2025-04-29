@@ -3,7 +3,8 @@ const jwt = require('jsonwebtoken');
 const connection = require("../Config/config");
 
 // Middleware to authenticate JWT token
-function authenticateToken(req, res, next) {
+async function authenticateToken(req, res, next) {
+    console.log("JWT Token middleware hit");
     const authHeader = req.header('Authorization');
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -12,50 +13,51 @@ function authenticateToken(req, res, next) {
 
     const token = authHeader.split(' ')[1];
 
-    connection.query(
-        "SELECT * FROM token_blacklist WHERE token = ?",
-        [token],
-        (err, results) => {
-            console.log("Token blacklist results:"); // Debugging line
+    try {
+        const [results] = await connection.execute(
+            "SELECT * FROM token_blacklist WHERE token = ?",
+            [token]
+        );
 
-            
-            if (err) {
-                return res.status(500).json({ error: "Database error: " + err.message });
-            }
+        console.log("Token blacklist results:", results);
 
-
-            if (results.length > 0) {
-                return res.status(401).json({ message: "Token has been logged out" });
-            }
-            
-            else{
-
-                jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-                    if (err) {
-                        return res.status(403).json({ error: 'Invalid or expired token' });
-                    }
-    
-                    req.user = user;
-                    next();
-                });
-
-
-            }
-
-            // ✅ Now do JWT verification only after checking the blacklist
-           
+        if (results.length > 0) {
+            return res.status(401).json({ message: "Token has been logged out" });
         }
-    );
+
+        // Verify token
+        jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+            if (err) {
+                return res.status(403).json({ error: 'Invalid or expired token' });
+            }
+
+            req.user = user;
+            console.log("Decoded user from JWT:", req.user);
+            next();
+        });
+    } catch (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({ error: "Database error: " + err.message });
+    }
 }
 
 // Middleware to authorize roles
 function authorizeRoles(...allowedRoles) {
     return (req, res, next) => {
-        if (!allowedRoles.includes(req.user.role)) {
+        console.log("authorizeRoles middleware hit");
+        console.log("User role in request:", req.user?.role); // Log user role
+        console.log("Allowed roles:", allowedRoles); // Log allowed roles
+
+        if (!req.user || !allowedRoles.includes(req.user.role)) {
+            console.log("Access denied: Role mismatch"); // Debugging line
             return res.status(403).json({ message: "Forbidden: You do not have permission to access this resource." });
         }
+
+        console.log("Access granted, moving to next middleware.");
         next();
     };
 }
+
+
 
 module.exports = { authenticateToken, authorizeRoles };

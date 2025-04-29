@@ -11,12 +11,7 @@ const path = require('path');
 
 const app = express();
 
-const corsOptions = {
-  origin: '*',  // Allow all origins, or specify a domain here
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-};
-app.use(cors(corsOptions));
+app.use(cors());
 
 const uploadsDir = path.join('D:', 'erpx-TMS', 'backend', 'uploads');  // The absolute path to the uploads folder
 
@@ -30,6 +25,10 @@ app.use('/uploads', express.static(uploadsDir, {
 app.use(bodyParser.json());
 app.use(express.json()); 
 
+app.use((req, res, next) => {
+  console.log(`📥 Incoming ${req.method} request to ${req.path}`);
+  next();
+});
 // Use the routes defined in routes.js
 app.use('/api', routes); 
 

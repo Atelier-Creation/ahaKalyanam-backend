@@ -4,8 +4,6 @@ const connection = require('../Config/config');
 const bcrypt = require('bcrypt');
 const jwt = require("jsonwebtoken");
 require("dotenv").config(); // Load .env variables
-require("dotenv").config(); // Load .env variables
-
 
 
 const updateUserDetails = async (userId, updatedFields) => {
