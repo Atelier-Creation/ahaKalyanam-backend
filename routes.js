@@ -360,7 +360,7 @@ router.post(
   }
 );
 
-router.post("/change-role", (req, res) => {
+router.post("/change-role", async (req, res) => {
   const { user_id, new_role } = req.body;
 
   if (!user_id || !new_role) {
@@ -369,20 +369,21 @@ router.post("/change-role", (req, res) => {
 
   const UPDATE_ROLE = `UPDATE users SET role = ? WHERE id = ?`;
 
-  connection.query(UPDATE_ROLE, [new_role, user_id], (err, result) => {
-    if (err) {
-      return res
-        .status(500)
-        .send({ error: "Error updating role: " + err.message });
+  try {
+    const [result] = await connection.execute(UPDATE_ROLE, [new_role, user_id]);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).send({ error: "User not found or role unchanged" });
     }
 
-    res
-      .status(200)
-      .send({
-        message: `User with ID ${user_id} has been updated to ${new_role}.`,
-      });
-  });
+    res.status(200).send({
+      message: `User with ID ${user_id} has been updated to ${new_role}.`,
+    });
+  } catch (err) {
+    res.status(500).send({ error: "Error updating role: " + err.message });
+  }
 });
+
 
 //  router.post("/registerProfile",authenticateToken,authorizeRoles("moderator", "admin"),upload.fields([{ name: "image_1" }, { name: "image_2" }]),async (req, res) => {
 //     console.log("➡️  /registerProfile route hit");
