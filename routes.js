@@ -15,7 +15,7 @@ const storage = multer.diskStorage({
   },
   filename: function (req, file, cb) {
     const sanitizedFilename = file.originalname.replace(/\s+/g, "-");
-    cb(null, Date.now() + "-" + file.sanitizedFilename);
+    cb(null, Date.now() + "-" + sanitizedFilename); 
   },
 });
 const jwt = require("jsonwebtoken");
