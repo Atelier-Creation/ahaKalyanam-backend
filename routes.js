@@ -11,10 +11,11 @@ const razorpay = new Razorpay({
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, "uploads/"); // Ensure 'uploads/' directory exists
+    cb(null, "uploads/"); 
   },
   filename: function (req, file, cb) {
-    cb(null, Date.now() + "-" + file.originalname);
+    const sanitizedFilename = file.originalname.replace(/\s+/g, "-");
+    cb(null, Date.now() + "-" + file.sanitizedFilename);
   },
 });
 const jwt = require("jsonwebtoken");
