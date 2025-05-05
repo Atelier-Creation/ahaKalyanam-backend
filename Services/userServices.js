@@ -311,7 +311,7 @@ const updateProfile = async (userId, updatedFields) => {
     }
 
     // Set empty strings to null for numeric fields like income and height
-    if ((field === 'income_per_month' || field === 'partner_income' || field === 'weight' || field === 'height') && updatedFields[field] === '') {
+    if ((field === 'income_per_month' || field === 'partner_income' || field === 'weight' || field === 'age' || field === 'height' || field === 'no_of_siblings') && updatedFields[field] === '') {
       updatedFields[field] = null;
     }
 
