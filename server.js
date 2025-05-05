@@ -13,7 +13,7 @@ const app = express();
 
 app.use(cors());
 
-const uploadsDir = path.join('D:', 'erpx-TMS', 'backend', 'uploads');  // The absolute path to the uploads folder
+// const uploadsDir = path.join('D:', 'erpx-TMS', 'backend', 'uploads');  // The absolute path to the uploads folder
 
 app.use('/uploads', express.static(uploadsDir, {
   setHeaders: (res, path) => {
