@@ -1,6 +1,8 @@
 const express = require("express");
 const multer = require("multer");
 const bcrypt = require("bcrypt");
+const crypto = require("crypto");
+const jwt = require("jsonwebtoken");
 
 const Razorpay = require("razorpay");
 
@@ -18,7 +20,7 @@ const storage = multer.diskStorage({
     cb(null, Date.now() + "-" + sanitizedFilename); 
   },
 });
-const jwt = require("jsonwebtoken");
+
 
 const upload = multer({
   storage: storage,
@@ -36,6 +38,7 @@ const {
   updateProfile,
   addUserInterests,
   getQuickSearch,
+  getProfileById,
 } = require("./Services/userServices");
 const { authenticateToken, authorizeRoles } = require("./Auth/middleware");
 require("dotenv").config();
@@ -61,7 +64,7 @@ router.post("/login", (req, res) => {
 router.post(
   "/create-order",
   authenticateToken,
-  authorizeRoles("moderator"),
+  authorizeRoles("moderator","user"),
   (req, res) => {
     const amount = 50000; // ₹500 in paise
     const currency = "INR";
@@ -85,6 +88,33 @@ router.post(
   }
 );
 
+// verify payment using Razorpay's payment signature
+
+router.post("/verify-payment", (req, res) => {
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    return res.status(400).json({ message: "Missing payment details" });
+  }
+
+  try {
+    const sign = `${razorpay_order_id}|${razorpay_payment_id}`;
+    const expectedSignature = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET || razorpay.key_secret)
+      .update(sign)
+      .digest("hex");
+
+    if (expectedSignature === razorpay_signature) {
+      return res.status(200).json({ message: "Payment verified successfully." });
+    } else {
+      return res.status(400).json({ message: "Invalid signature. Verification failed." });
+    }
+  } catch (err) {
+    console.error("Verification error:", err);
+    return res.status(500).json({ message: "Server error during verification." });
+  }
+});
+
 // Promote user to moderator based on register number
 router.post("/promote-to-moderator", async (req, res) => {
   const { register_number } = req.body;
@@ -106,7 +136,8 @@ router.post("/promote-to-moderator", async (req, res) => {
     const user = users[0];
 
     if (user.role === "moderator") {
-      return res.status(200).send({ message: "User is already a moderator" });
+      const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: "1h" });
+      return res.status(200).send({ message: "User is already a moderator", token });
     }
 
     if (user.role !== "user") {
@@ -119,9 +150,10 @@ router.post("/promote-to-moderator", async (req, res) => {
       `UPDATE users SET role = 'moderator' WHERE id = ?`,
       [register_number]
     );
-
+    const newToken = jwt.sign({ id: user.id, role: "moderator" }, JWT_SECRET, { expiresIn: "1h" });
     return res.status(200).send({
       message: `User with register number ${register_number} has been promoted to moderator.`,
+      token: newToken,
     });
   } catch (err) {
     return res.status(500).send({ error: "Database error: " + err.message });
@@ -494,8 +526,9 @@ router.get("/allprofiles", async (req, res) => {
 
 router.post("/add-interests", authenticateToken, async (req, res) => {
   const { user_id, liked_profile_id } = req.body;
-
-  addUserInterests(user_id, liked_profile_id)
+  console.log(user_id, liked_profile_id);
+  
+    addUserInterests(user_id, liked_profile_id)
     .then((result) => {
       res.status(200).send({ message: result });
     })
@@ -509,6 +542,23 @@ router.get("/profile/:id", async (req, res) => {
 
   try {
     const result = await getProfile(id); // Call the function to fetch the profile
+    res.status(200).json({
+      status: 200,
+      message: "Profile fetched successfully",
+      data: result,
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: 500,
+      error: err.message,
+    });
+  }
+});
+router.get("/profilebyuserid/:id", async (req, res) => {
+  const { id } = req.params; // Get the ID from the URL
+
+  try {
+    const result = await getProfileById(id); // Call the function to fetch the profile
     res.status(200).json({
       status: 200,
       message: "Profile fetched successfully",
@@ -707,16 +757,27 @@ router.get(
   async (req, res) => {
     // const user_id = req.user.id; // Extract user ID from token
     const { id } = req.params;
+console.log(id);
 
     const GET_LIKED_PROFILES = `
-    SELECT up.id, up.linked_to, up.name, up.city, up.age, up.image_1 
-    FROM user_profiles up
-    JOIN user_liked_profiles ul ON ul.liked_profiles = up.linked_to
-    WHERE ul.user_id = ?
-    ORDER BY ul.liked_at DESC;
+ SELECT 
+  up.id,
+  up.name,
+  up.city,
+  up.age,
+  up.image_1,
+  u.role
+FROM user_profiles up
+JOIN user_liked_profiles ul ON ul.liked_profiles = up.id
+JOIN users u ON up.linked_to = u.id
+WHERE ul.user_id = ?
+ORDER BY ul.liked_at DESC;
+
     `;
     try {
       const [results] = await connection.execute(GET_LIKED_PROFILES, [id]);
+      console.log(results);
+      
       res
         .status(200)
         .json({

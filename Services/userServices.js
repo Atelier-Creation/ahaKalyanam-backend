@@ -276,18 +276,42 @@ const resetUserPassword = async (user_id, new_password_hash) => {
 
 
 const addUserInterests = async (user_id, liked_profile_id) => {
-  const ADD_USER_INTERESTS = "INSERT INTO user_liked_profiles(user_id, liked_profiles) VALUES (?, ?)";
+  const CHECK_EXISTENCE = `
+    SELECT 1 FROM user_liked_profiles WHERE user_id = ? AND liked_profiles = ?
+  `;
 
-  return new Promise((resolve, reject) => {
-    connection.query(ADD_USER_INTERESTS, [user_id, liked_profile_id], (error, results) => {
-      if (error) {
-        reject({ success: false, message: "Error adding liked profile", error });
-      } else {
-        resolve({ success: true, message: "Liked profile added successfully", inserted_id: results.insertId });
-      }
-    });
-  });
+  const ADD_USER_INTERESTS = `
+    INSERT INTO user_liked_profiles(user_id, liked_profiles) VALUES (?, ?)
+  `;
+
+  try {
+    const [existing] = await connection.execute(CHECK_EXISTENCE, [user_id, liked_profile_id]);
+
+    if (existing.length > 0) {
+      return {
+        success: false,
+        message: "Interest already sent previously."
+      };
+    }
+
+    const [results] = await connection.execute(ADD_USER_INTERESTS, [user_id, liked_profile_id]);
+
+    return {
+      success: true,
+      message: "Liked profile added successfully",
+      inserted_id: results.insertId,
+    };
+  } catch (error) {
+    console.error("❌ Error adding liked profile:", error.message);
+    throw {
+      success: false,
+      message: "Error adding liked profile",
+      error,
+    };
+  }
 };
+
+
 
 
 
