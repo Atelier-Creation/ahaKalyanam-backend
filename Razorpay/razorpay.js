@@ -6,7 +6,7 @@ const razorpay = new Razorpay({
   key_secret: "va85c9wWgBo26unuEHuB8zdm",
 });
 
-app.post("/create-order", async (req, res) => {
+app.post("/createorder", async (req, res) => {
   const options = {
     amount: 100000, // 1000 INR in paise
     currency: "INR",

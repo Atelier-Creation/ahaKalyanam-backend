@@ -64,29 +64,33 @@ router.post("/login", (req, res) => {
 router.post(
   "/create-order",
   authenticateToken,
-  authorizeRoles("moderator","user"),
-  (req, res) => {
-    const amount = 100000; // ₹1000 in paise
-    const currency = "INR";
-    const receipt = "order_rcptid_" + Math.floor(Math.random() * 1000000);
+  authorizeRoles("moderator", "user"),
+  async (req, res) => {
+    try {
+      const amount = 100000; // ₹1000 in paise
+      const currency = "INR";
+      const receipt = `order_rcptid_${Math.floor(Math.random() * 1000000)}`;
 
-    const options = {
-      amount: amount,
-      currency: currency,
-      receipt: receipt,
-    };
+      const options = { amount, currency, receipt };
 
-    razorpay.orders
-      .create(options)
-      .then((order) => {
-        res.status(200).send({ order }); // Send order back to frontend
-      })
-      .catch((err) => {
-        console.error("Error creating Razorpay order:", err);
-        res.status(500).send({ error: "Failed to create Razorpay order" });
-      });
+      console.log("🧾 Creating Razorpay Order:", options);
+
+      const order = await razorpay.orders.create(options);
+
+      console.log("✅ Razorpay Order Created:", order);
+
+      if (!order.id) {
+        throw new Error("No order.id returned from Razorpay");
+      }
+
+      res.status(200).json({ order });
+    } catch (err) {
+      console.error("❌ Razorpay Order Error:", err);
+      res.status(500).json({ error: err.message });
+    }
   }
 );
+
 
 // verify payment using Razorpay's payment signature
 
