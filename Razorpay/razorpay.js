@@ -2,13 +2,13 @@
 const Razorpay = require("razorpay");
 
 const razorpay = new Razorpay({
-  key_id: "rzp_test_FaDMhj1BABXeNp",
-  key_secret: "WSfCaTByiOPQYfMwn2zNszaA",
+  key_id: "rzp_live_RM7S1lB5Kj6IQv",
+  key_secret: "va85c9wWgBo26unuEHuB8zdm",
 });
 
 app.post("/create-order", async (req, res) => {
   const options = {
-    amount: 50000, // 500 INR in paise
+    amount: 100000, // 1000 INR in paise
     currency: "INR",
     receipt: "order_rcptid_11",
   };

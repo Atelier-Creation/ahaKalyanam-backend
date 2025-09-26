@@ -7,8 +7,8 @@ const jwt = require("jsonwebtoken");
 const Razorpay = require("razorpay");
 
 const razorpay = new Razorpay({
-  key_id: "rzp_live_RM7S1lB5Kj6IQv",
-  key_secret: "va85c9wWgBo26unuEHuB8zdm",
+  key_id: "rzp_test_FaDMhj1BABXeNp",
+  key_secret: "WSfCaTByiOPQYfMwn2zNszaA",
 });
 
 const storage = multer.diskStorage({
@@ -24,7 +24,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 100 * 1024 * 1024 }, // 10 MB file limit
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB file limit
 });
 const connection = require("./Config/config");
 
@@ -66,7 +66,7 @@ router.post(
   authenticateToken,
   authorizeRoles("moderator","user"),
   (req, res) => {
-    const amount = 100000; // ₹1000 in paise
+    const amount = 50000; // ₹500 in paise
     const currency = "INR";
     const receipt = "order_rcptid_" + Math.floor(Math.random() * 1000000);
 
@@ -87,6 +87,25 @@ router.post(
       });
   }
 );
+
+router.post("/verify-payment", async (req, res) => {
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+  const key_secret = process.env.RAZORPAY_SECRET || "WSfCaTByiOPQYfMwn2zNszaA";
+
+  const generated_signature = crypto
+    .createHmac("sha256", key_secret)
+    .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+    .digest("hex");
+
+  if (generated_signature === razorpay_signature) {
+    res.status(200).json({ verified: true });
+  } else {
+    res.status(400).json({ verified: false, error: "Invalid signature" });
+  }
+});
+
+
 
 // verify payment using Razorpay's payment signature
 
