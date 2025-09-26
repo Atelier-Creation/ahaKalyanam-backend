@@ -1,10 +1,9 @@
-const User = require('../Model/userModel');
+const User = require("../Model/userModel");
 
-const connection = require('../Config/config');
-const bcrypt = require('bcrypt');
+const connection = require("../Config/config");
+const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 require("dotenv").config(); // Load .env variables
-
 
 const updateUserDetails = async (userId, updatedFields) => {
   try {
@@ -13,32 +12,42 @@ const updateUserDetails = async (userId, updatedFields) => {
     }
 
     const setClause = Object.keys(updatedFields)
-      .map(field => `${field} = ?`)
-      .join(', ');
+      .map((field) => `${field} = ?`)
+      .join(", ");
     const values = [...Object.values(updatedFields), userId];
 
     const query = `UPDATE users SET ${setClause} WHERE user_id = ?`;
 
     const [result] = await connection.execute(query, values);
 
-    console.log('Result:', result);
+    console.log("Result:", result);
 
     if (result.affectedRows === 0) {
-      console.log('❌ No user updated. Check the user ID.');
-      return { result: false, message: 'User not found' };
+      console.log("❌ No user updated. Check the user ID.");
+      return { result: false, message: "User not found" };
     }
 
-    console.log('✅ User updated successfully!');
-    return { result: true, message: 'User updated successfully' };
-
+    console.log("✅ User updated successfully!");
+    return { result: true, message: "User updated successfully" };
   } catch (error) {
-    console.error('❌ Error updating user:', error.message);
-    return { result: false, message: 'Error updating user', error: error.message };
+    console.error("❌ Error updating user:", error.message);
+    return {
+      result: false,
+      message: "Error updating user",
+      error: error.message,
+    };
   }
 };
 
-
-const getQuickSearch = async (gender, min_age, max_age, religion, caste, sub_caste, marital_status) => {
+const getQuickSearch = async (
+  gender,
+  min_age,
+  max_age,
+  religion,
+  caste,
+  sub_caste,
+  marital_status
+) => {
   const QUICK_SEARCH = `
     SELECT * FROM user_profiles 
     WHERE (? IS NULL OR gender = ?)
@@ -52,40 +61,43 @@ const getQuickSearch = async (gender, min_age, max_age, religion, caste, sub_cas
 
   try {
     const [results] = await connection.execute(QUICK_SEARCH, [
-      gender, gender,
-      min_age, min_age,
-      max_age, max_age,
-      religion, religion,
-      caste, caste,
-      sub_caste, sub_caste,
-      marital_status, marital_status
+      gender,
+      gender,
+      min_age,
+      min_age,
+      max_age,
+      max_age,
+      religion,
+      religion,
+      caste,
+      caste,
+      sub_caste,
+      sub_caste,
+      marital_status,
+      marital_status,
     ]);
 
     if (results.length === 0) {
       return {
         status: 401,
-        message: "No profile found for this filter"
+        message: "No profile found for this filter",
       };
     }
 
     return {
       status: 200,
       message: "Quick search results",
-      data: results
+      data: results,
     };
-
   } catch (error) {
-    console.error('❌ Error in quick search:', error.message);
+    console.error("❌ Error in quick search:", error.message);
     return {
       status: 500,
       message: "Database error",
-      error: error.message
+      error: error.message,
     };
   }
 };
-
-
-
 
 const loginCheck = async (email, password) => {
   const LOGIN_USER = `SELECT * FROM users WHERE mail_id = ?`;
@@ -94,39 +106,36 @@ const loginCheck = async (email, password) => {
     const [results] = await connection.execute(LOGIN_USER, [email]);
 
     if (results.length === 0) {
-      return { status: 401, error: 'Invalid email or account deactivated' };
+      return { status: 401, error: "Invalid email or account deactivated" };
     }
 
     const user = results[0];
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return { status: 401, error: 'Invalid email or password' };
+      return { status: 401, error: "Invalid email or password" };
     }
 
     const token = jwt.sign(
       { user_id: user.id, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: '6h' }
+      { expiresIn: "6h" }
     );
 
     return {
       status: 200,
-      message: 'Login successful',
-      token: token
+      message: "Login successful",
+      token: token,
     };
-
   } catch (error) {
-    console.error('❌ Error during login:', error.message);
-    return { status: 500, error: 'Server error' };
+    console.error("❌ Error during login:", error.message);
+    return { status: 500, error: "Server error" };
   }
 };
 
-
-
 const createUser = async (name, email, phone, password, gender) => {
   const role = gender === "Female" ? "moderator" : "user";
-  
+
   const CREATE_USER = `
     INSERT INTO users (name, mail_id, password, phone, register_number, gender, role)
     VALUES (?, ?, ?, ?, 
@@ -140,43 +149,51 @@ const createUser = async (name, email, phone, password, gender) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const [result] = await connection.execute(CREATE_USER, [
-      name, email, hashedPassword, phone, gender, role
+      name,
+      email,
+      hashedPassword,
+      phone,
+      gender,
+      role,
     ]);
 
     const [user] = await connection.execute(SELECT_USER, [email]);
 
     if (!user || user.length === 0) {
-      throw new Error("User creation failed or user not found after registration.");
+      throw new Error(
+        "User creation failed or user not found after registration."
+      );
     }
 
     const token = jwt.sign(
-      { user_id: user[0].id, role: user[0].role },
+      {
+        user_id: user[0].id,
+        role: user[0].role,
+        name: user[0].name,
+        email: user[0].mail_id,
+        phone: user[0].phone,
+      },
       process.env.JWT_SECRET,
-      { expiresIn: '6h' }
+      { expiresIn: "6h" }
     );
 
     return {
       status: 200,
-      message: 'User registered successfully!',
+      message: "User registered successfully!",
       token: token,
       user_id: user[0].id,
     };
-
   } catch (err) {
-    console.error('❌ Error during user creation:', err.message);
-    throw new Error('Error during user creation: ' + err.message);
+    console.error("❌ Error during user creation:", err.message);
+    throw new Error("Error during user creation: " + err.message);
   }
 };
-
-
-
-
 
 const getAllProfile = async () => {
   const GET_ALL_USERS = `SELECT * FROM user_profiles;`;
 
   try {
-    const [users] = await connection.execute(GET_ALL_USERS);  // Using await with execute
+    const [users] = await connection.execute(GET_ALL_USERS); // Using await with execute
 
     if (users.length === 0) {
       throw new Error("No users found.");
@@ -188,10 +205,6 @@ const getAllProfile = async () => {
     throw new Error("Error fetching users: " + err.message);
   }
 };
-
-
-
-
 
 const getProfile = async (register_id) => {
   const GET_USER_PROFILE = `SELECT * FROM user_profiles WHERE id = ?`;
@@ -252,12 +265,15 @@ const getViewProfile = async (register_id) => {
   }
 };
 
-
 const resetUserPassword = async (user_id, new_password_hash) => {
-  const RESET_PASSWORD_QUERY = "UPDATE users SET password = ? WHERE mail_id = ?";
+  const RESET_PASSWORD_QUERY =
+    "UPDATE users SET password = ? WHERE mail_id = ?";
 
   try {
-    const [results] = await connection.execute(RESET_PASSWORD_QUERY, [new_password_hash, user_id]);
+    const [results] = await connection.execute(RESET_PASSWORD_QUERY, [
+      new_password_hash,
+      user_id,
+    ]);
 
     if (results.affectedRows === 0) {
       throw new Error("User not found");
@@ -270,11 +286,6 @@ const resetUserPassword = async (user_id, new_password_hash) => {
   }
 };
 
-
-
-
-
-
 const addUserInterests = async (user_id, liked_profile_id) => {
   const CHECK_EXISTENCE = `
     SELECT 1 FROM user_liked_profiles WHERE user_id = ? AND liked_profiles = ?
@@ -285,16 +296,22 @@ const addUserInterests = async (user_id, liked_profile_id) => {
   `;
 
   try {
-    const [existing] = await connection.execute(CHECK_EXISTENCE, [user_id, liked_profile_id]);
+    const [existing] = await connection.execute(CHECK_EXISTENCE, [
+      user_id,
+      liked_profile_id,
+    ]);
 
     if (existing.length > 0) {
       return {
         success: false,
-        message: "Interest already sent previously."
+        message: "Interest already sent previously.",
       };
     }
 
-    const [results] = await connection.execute(ADD_USER_INTERESTS, [user_id, liked_profile_id]);
+    const [results] = await connection.execute(ADD_USER_INTERESTS, [
+      user_id,
+      liked_profile_id,
+    ]);
 
     return {
       success: true,
@@ -311,51 +328,56 @@ const addUserInterests = async (user_id, liked_profile_id) => {
   }
 };
 
-
-
-
-
-
 const updateProfile = async (userId, updatedFields) => {
-
-  const validFields = Object.keys(updatedFields).filter(field => {
-    return updatedFields[field] !== undefined && updatedFields[field] !== null && updatedFields[field] !== '';
+  const validFields = Object.keys(updatedFields).filter((field) => {
+    return (
+      updatedFields[field] !== undefined &&
+      updatedFields[field] !== null &&
+      updatedFields[field] !== ""
+    );
   });
 
-
   if (validFields.length === 0) {
-
     throw new Error("No valid fields provided for update.");
   }
 
   // Handle potential array values and empty strings for numeric fields
-  validFields.forEach(field => {
+  validFields.forEach((field) => {
     if (Array.isArray(updatedFields[field])) {
-      updatedFields[field] = updatedFields[field][0];  // Take the first element if it's an array
+      updatedFields[field] = updatedFields[field][0]; // Take the first element if it's an array
     }
 
     // Set empty strings to null for numeric fields like income and height
-    if ((field === 'income_per_month' || field === 'partner_income' || field === 'weight' || field === 'age' || field === 'height' || field === 'no_of_siblings') && updatedFields[field] === '') {
+    if (
+      (field === "income_per_month" ||
+        field === "partner_income" ||
+        field === "weight" ||
+        field === "age" ||
+        field === "height" ||
+        field === "no_of_siblings") &&
+      updatedFields[field] === ""
+    ) {
       updatedFields[field] = null;
     }
 
-    if (field === 'horoscope_required') {
-      updatedFields[field] = updatedFields[field] === 'Must' ? 1 : 0;  // Convert 'Must' to 1, otherwise 0
+    if (field === "horoscope_required") {
+      updatedFields[field] = updatedFields[field] === "Must" ? 1 : 0; // Convert 'Must' to 1, otherwise 0
     }
   });
-  if (field === 'married') {
-  updatedFields[field] =
-    updatedFields[field] === 'true' ||
-    updatedFields[field] === '1' ||
-    updatedFields[field] === 1;
-}
+  if (field === "married") {
+    updatedFields[field] =
+      updatedFields[field] === "true" ||
+      updatedFields[field] === "1" ||
+      updatedFields[field] === 1;
+  }
 
   // Prepare SQL query
-  const updateQuery = `UPDATE user_profiles SET ${validFields.map(field => `${field} = ?`).join(', ')} WHERE linked_to = ?`;
+  const updateQuery = `UPDATE user_profiles SET ${validFields
+    .map((field) => `${field} = ?`)
+    .join(", ")} WHERE linked_to = ?`;
 
   // Prepare values for the query (the valid fields + userId)
-  const values = [...validFields.map(field => updatedFields[field]), userId];
-
+  const values = [...validFields.map((field) => updatedFields[field]), userId];
 
   try {
     const [result] = await connection.execute(updateQuery, values);
@@ -363,16 +385,23 @@ const updateProfile = async (userId, updatedFields) => {
     if (result.affectedRows === 0) {
       throw new Error("No rows affected. User not found or no changes made.");
     }
-    return { userId, updatedFields, result};
+    return { userId, updatedFields, result };
   } catch (error) {
-    console.error("Error updating user profile:", error.message); 
+    console.error("Error updating user profile:", error.message);
     throw new Error("Error updating user profile: " + error.message);
   }
 };
 
-
-
-
-
-
-module.exports = { updateUserDetails, loginCheck, createUser,getProfileById, resetUserPassword, getAllProfile, getProfile, getViewProfile, updateProfile, addUserInterests, getQuickSearch};
+module.exports = {
+  updateUserDetails,
+  loginCheck,
+  createUser,
+  getProfileById,
+  resetUserPassword,
+  getAllProfile,
+  getProfile,
+  getViewProfile,
+  updateProfile,
+  addUserInterests,
+  getQuickSearch,
+};

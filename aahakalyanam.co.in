@@ -1,0 +1,42 @@
+# Redirect all HTTP requests to HTTPS
+server {
+    listen 80;
+    server_name aahakalyanam.co.in www.aahakalyanam.co.in;
+
+    return 301 https://$host$request_uri;
+}
+
+# HTTPS server block
+server {
+    listen 443 ssl;
+    server_name aahakalyanam.co.in www.aahakalyanam.co.in;
+
+    root /var/www/html/ahaMatFront;
+    index index.html;
+
+    ssl_certificate /etc/letsencrypt/live/aahakalyanam.co.in/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/aahakalyanam.co.in/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    # Serve frontend SPA
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Proxy API calls to backend (running via PM2)
+location /api/ {
+    proxy_pass http://localhost:5000;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection 'upgrade';
+    proxy_set_header Host $host;
+    proxy_cache_bypass $http_upgrade;
+}
+
+
+    # Serve static uploads from backend
+    location /uploads/ {
+        proxy_pass http://localhost:5000/uploads/;
+    }
+}
