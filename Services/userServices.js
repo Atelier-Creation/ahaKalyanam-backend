@@ -363,13 +363,15 @@ const updateProfile = async (userId, updatedFields) => {
     if (field === "horoscope_required") {
       updatedFields[field] = updatedFields[field] === "Must" ? 1 : 0; // Convert 'Must' to 1, otherwise 0
     }
+
+    // Move the married field logic inside the forEach loop
+    if (field === "married") {
+      updatedFields[field] =
+        updatedFields[field] === "true" ||
+        updatedFields[field] === "1" ||
+        updatedFields[field] === 1;
+    }
   });
-  if (field === "married") {
-    updatedFields[field] =
-      updatedFields[field] === "true" ||
-      updatedFields[field] === "1" ||
-      updatedFields[field] === 1;
-  }
 
   // Prepare SQL query
   const updateQuery = `UPDATE user_profiles SET ${validFields
