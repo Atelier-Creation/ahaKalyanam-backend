@@ -13,14 +13,13 @@ const razorpay = new Razorpay({
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, "uploads/"); 
+    cb(null, "uploads/");
   },
   filename: function (req, file, cb) {
     const sanitizedFilename = file.originalname.replace(/\s+/g, "-");
-    cb(null, Date.now() + "-" + sanitizedFilename); 
+    cb(null, Date.now() + "-" + sanitizedFilename);
   },
 });
-
 
 const upload = multer({
   storage: storage,
@@ -91,11 +90,11 @@ router.post(
   }
 );
 
-
 // verify payment using Razorpay's payment signature
 
 router.post("/verify-payment", (req, res) => {
-  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =
+    req.body;
 
   if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
     return res.status(400).json({ message: "Missing payment details" });
@@ -104,18 +103,27 @@ router.post("/verify-payment", (req, res) => {
   try {
     const sign = `${razorpay_order_id}|${razorpay_payment_id}`;
     const expectedSignature = crypto
-      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET || razorpay.key_secret)
+      .createHmac(
+        "sha256",
+        process.env.RAZORPAY_KEY_SECRET || razorpay.key_secret
+      )
       .update(sign)
       .digest("hex");
 
     if (expectedSignature === razorpay_signature) {
-      return res.status(200).json({ message: "Payment verified successfully." });
+      return res
+        .status(200)
+        .json({ message: "Payment verified successfully." });
     } else {
-      return res.status(400).json({ message: "Invalid signature. Verification failed." });
+      return res
+        .status(400)
+        .json({ message: "Invalid signature. Verification failed." });
     }
   } catch (err) {
     console.error("Verification error:", err);
-    return res.status(500).json({ message: "Server error during verification." });
+    return res
+      .status(500)
+      .json({ message: "Server error during verification." });
   }
 });
 
@@ -140,8 +148,12 @@ router.post("/promote-to-moderator", async (req, res) => {
     const user = users[0];
 
     if (user.role === "moderator") {
-      const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: "1h" });
-      return res.status(200).send({ message: "User is already a moderator", token });
+      const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, {
+        expiresIn: "1h",
+      });
+      return res
+        .status(200)
+        .send({ message: "User is already a moderator", token });
     }
 
     if (user.role !== "user") {
@@ -154,7 +166,9 @@ router.post("/promote-to-moderator", async (req, res) => {
       `UPDATE users SET role = 'moderator' WHERE id = ?`,
       [register_number]
     );
-    const newToken = jwt.sign({ id: user.id, role: "moderator" }, JWT_SECRET, { expiresIn: "1h" });
+    const newToken = jwt.sign({ id: user.id, role: "moderator" }, JWT_SECRET, {
+      expiresIn: "1h",
+    });
     return res.status(200).send({
       message: `User with register number ${register_number} has been promoted to moderator.`,
       token: newToken,
@@ -190,10 +204,18 @@ router.post(
 
     try {
       const cleanedBody = Object.fromEntries(
-        Object.entries(req.body).map(([key, value]) => [
-          key.trim(),
-          value.toString().trim(),
-        ])
+        Object.entries(req.body).map(([key, value]) => {
+          if (typeof value === "string") {
+            return [key.trim(), value.trim()];
+          } else if (typeof value === "object") {
+            // Keep objects (like siblings) as-is or stringify if needed
+            return [key.trim(), value];
+          } else if (value === undefined || value === null) {
+            return [key.trim(), null];
+          } else {
+            return [key.trim(), value];
+          }
+        })
       );
 
       const safeValue = (val) => {
@@ -274,12 +296,10 @@ router.post(
       );
 
       if (req.user.role === "moderator" && userCheck.length > 0) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message: "Moderators can only create one profile.",
-          });
+        return res.status(400).json({
+          success: false,
+          message: "Moderators can only create one profile.",
+        });
       }
 
       const query = `
@@ -356,7 +376,7 @@ router.post(
 
       const [result] = await connection.execute(query, values);
       console.log(result);
-      
+
       res.json({ success: true, status: 200, data: { id: result.insertId } });
     } catch (error) {
       console.error(error);
@@ -373,12 +393,10 @@ router.post(
     const { mail_id, new_password } = req.body;
 
     if (!mail_id || !new_password) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "user_id and new_password are required",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "user_id and new_password are required",
+      });
     }
 
     // Hash the new password
@@ -410,7 +428,9 @@ router.post("/change-role", async (req, res) => {
     const [result] = await connection.execute(UPDATE_ROLE, [new_role, user_id]);
 
     if (result.affectedRows === 0) {
-      return res.status(404).send({ error: "User not found or role unchanged" });
+      return res
+        .status(404)
+        .send({ error: "User not found or role unchanged" });
     }
 
     res.status(200).send({
@@ -420,7 +440,6 @@ router.post("/change-role", async (req, res) => {
     res.status(500).send({ error: "Error updating role: " + err.message });
   }
 });
-
 
 //  router.post("/registerProfile",authenticateToken,authorizeRoles("moderator", "admin"),upload.fields([{ name: "image_1" }, { name: "image_2" }]),async (req, res) => {
 //     console.log("➡️  /registerProfile route hit");
@@ -531,8 +550,8 @@ router.get("/allprofiles", async (req, res) => {
 router.post("/add-interests", authenticateToken, async (req, res) => {
   const { user_id, liked_profile_id } = req.body;
   console.log(user_id, liked_profile_id);
-  
-    addUserInterests(user_id, liked_profile_id)
+
+  addUserInterests(user_id, liked_profile_id)
     .then((result) => {
       res.status(200).send({ message: result });
     })
@@ -559,19 +578,37 @@ router.get("/profile/:id", async (req, res) => {
   }
 });
 router.get("/profilebyuserid/:id", async (req, res) => {
-  const { id } = req.params; // Get the ID from the URL
-
   try {
-    const result = await getProfileById(id); // Call the function to fetch the profile
+    const { id } = req.params;
+
+    // Validate ID before querying
+    if (!id) {
+      return res.status(400).json({
+        status: 400,
+        message: "User ID is required",
+      });
+    }
+
+    const result = await getProfileById(id);
+
+    if (!result) {
+      return res.status(404).json({
+        status: 404,
+        message: "Profile not found",
+      });
+    }
+
     res.status(200).json({
       status: 200,
       message: "Profile fetched successfully",
       data: result,
     });
-  } catch (err) {
+  } catch (error) {
+    console.error("Error fetching profile:", error);
     res.status(500).json({
       status: 500,
-      error: err.message,
+      message: "Internal server error",
+      error: error.message,
     });
   }
 });
@@ -581,10 +618,23 @@ router.get("/view-profile/:id", async (req, res) => {
 
   try {
     const result = await getViewProfile(id); // Call the function to fetch the profile
+    const parseJSON = (val) => {
+      try {
+        return typeof val === "string" ? JSON.parse(val) : val;
+      } catch {
+        return val;
+      }
+    };
+
+    const parsedResult = {
+      ...result,
+      siblings_marital_status: parseJSON(result.siblings_marital_status),
+    };
+
     res.status(200).json({
       status: 200,
       message: "Profile fetched successfully",
-      data: result,
+      data: parsedResult,
     });
   } catch (err) {
     res.status(500).json({
@@ -631,13 +681,11 @@ router.put(
       const result = await updateProfile(userId, updatedFields);
 
       if (result.result.affectedRows > 0) {
-        return res
-          .status(200)
-          .json({
-            status: 200,
-            message: "Profile updated successfully",
-            data: result,
-          });
+        return res.status(200).json({
+          status: 200,
+          message: "Profile updated successfully",
+          data: result,
+        });
       } else {
         return res
           .status(404)
@@ -761,7 +809,7 @@ router.get(
   async (req, res) => {
     // const user_id = req.user.id; // Extract user ID from token
     const { id } = req.params;
-console.log(id);
+    console.log(id);
 
     const GET_LIKED_PROFILES = `
  SELECT 
@@ -781,14 +829,12 @@ ORDER BY ul.liked_at DESC;
     try {
       const [results] = await connection.execute(GET_LIKED_PROFILES, [id]);
       console.log(results);
-      
-      res
-        .status(200)
-        .json({
-          status: 200,
-          message: "Liked profiles fetched successfully!",
-          data: results,
-        });
+
+      res.status(200).json({
+        status: 200,
+        message: "Liked profiles fetched successfully!",
+        data: results,
+      });
     } catch (err) {
       res
         .status(500)

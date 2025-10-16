@@ -329,6 +329,7 @@ const addUserInterests = async (user_id, liked_profile_id) => {
 };
 
 const updateProfile = async (userId, updatedFields) => {
+  // ✅ Filter only valid (non-empty) fields
   const validFields = Object.keys(updatedFields).filter((field) => {
     return (
       updatedFields[field] !== undefined &&
@@ -341,42 +342,45 @@ const updateProfile = async (userId, updatedFields) => {
     throw new Error("No valid fields provided for update.");
   }
 
-  // Handle potential array values and empty strings for numeric fields
+  // ✅ Clean & normalize field values
   validFields.forEach((field) => {
+    // Handle array values (like from form-data)
     if (Array.isArray(updatedFields[field])) {
-      updatedFields[field] = updatedFields[field][0]; // Take the first element if it's an array
+      updatedFields[field] = updatedFields[field][0];
     }
 
-    // Set empty strings to null for numeric fields like income and height
+    // Convert empty strings for numeric fields to null
     if (
-      (field === "income_per_month" ||
-        field === "partner_income" ||
-        field === "weight" ||
-        field === "age" ||
-        field === "height" ||
-        field === "no_of_siblings") &&
+      ["income_per_month", "partner_income", "weight", "age", "height", "no_of_siblings"].includes(
+        field
+      ) &&
       updatedFields[field] === ""
     ) {
       updatedFields[field] = null;
     }
 
+    // Convert text to boolean (if applicable)
     if (field === "horoscope_required") {
-      updatedFields[field] = updatedFields[field] === "Must" ? 1 : 0; // Convert 'Must' to 1, otherwise 0
+      updatedFields[field] = updatedFields[field] === "Must" ? 1 : 0;
+    }
+
+    // Convert 'true'/'false' string to boolean
+    if (field === "married") {
+      updatedFields[field] =
+        updatedFields[field] === "true" ||
+        updatedFields[field] === "1" ||
+        updatedFields[field] === 1;
     }
   });
-  if (field === "married") {
-    updatedFields[field] =
-      updatedFields[field] === "true" ||
-      updatedFields[field] === "1" ||
-      updatedFields[field] === 1;
-  }
 
-  // Prepare SQL query
-  const updateQuery = `UPDATE user_profiles SET ${validFields
-    .map((field) => `${field} = ?`)
-    .join(", ")} WHERE linked_to = ?`;
+  // ✅ Build the SQL query dynamically
+  const updateQuery = `
+    UPDATE user_profiles 
+    SET ${validFields.map((field) => `${field} = ?`).join(", ")} 
+    WHERE linked_to = ?
+  `;
 
-  // Prepare values for the query (the valid fields + userId)
+  // ✅ Prepare parameterized values (prevents SQL injection)
   const values = [...validFields.map((field) => updatedFields[field]), userId];
 
   try {
@@ -385,12 +389,14 @@ const updateProfile = async (userId, updatedFields) => {
     if (result.affectedRows === 0) {
       throw new Error("No rows affected. User not found or no changes made.");
     }
+
     return { userId, updatedFields, result };
   } catch (error) {
     console.error("Error updating user profile:", error.message);
     throw new Error("Error updating user profile: " + error.message);
   }
 };
+
 
 module.exports = {
   updateUserDetails,
