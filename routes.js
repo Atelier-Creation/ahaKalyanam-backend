@@ -36,6 +36,7 @@ const {
   resetUserPassword,
   updateProfile,
   addUserInterests,
+  getProfilesPaginated,
   getQuickSearch,
   getProfileById,
 } = require("./Services/userServices");
@@ -546,6 +547,70 @@ router.get("/allprofiles", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+router.get("/profiles", async (req, res) => {
+  try {
+    const { page = 1, limit = 10, search = "" } = req.query; // added search param
+    const result = await getProfilesPaginated(page, limit, search);
+
+    res.status(200).json({
+      status: 200,
+      message: "Profiles fetched successfully",
+      data: result,
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: 500,
+      message: "Error fetching profiles",
+      error: err.message,
+    });
+  }
+});
+
+// ✅ DELETE user by ID
+router.delete(
+  "/delete-profile/:id",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({
+        status: 400,
+        message: "Profile ID is required",
+      });
+    }
+
+    try {
+      // Delete profile from user_profiles table
+      const [result] = await connection.execute(
+        "DELETE FROM user_profiles WHERE id = ?",
+        [id]
+      );
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({
+          status: 404,
+          message: "Profile not found or already deleted",
+        });
+      }
+
+      return res.status(200).json({
+        status: 200,
+        message: `Profile with ID ${id} deleted successfully`,
+      });
+    } catch (error) {
+      console.error("Error deleting profile:", error);
+      return res.status(500).json({
+        status: 500,
+        message: "Error deleting profile",
+        error: error.message,
+      });
+    }
+  }
+);
+
 
 router.post("/add-interests", authenticateToken, async (req, res) => {
   const { user_id, liked_profile_id } = req.body;

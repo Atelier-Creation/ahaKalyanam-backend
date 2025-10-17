@@ -205,6 +205,39 @@ const getAllProfile = async () => {
     throw new Error("Error fetching users: " + err.message);
   }
 };
+const getProfilesPaginated = async (page = 1, limit = 10, search = "") => {
+  const offset = (page - 1) * limit;
+
+  try {
+    let whereClause = "";
+    const params = [];
+
+    if (search) {
+      // Search across multiple columns
+      whereClause = `WHERE name LIKE ? OR caste LIKE ? OR gender LIKE ? OR contact_number LIKE ?`;
+      const searchTerm = `%${search}%`;
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm);
+    }
+
+    // Fetch total count (with search applied if any)
+    const [countResult] = await connection.execute(
+      `SELECT COUNT(*) as total FROM user_profiles ${whereClause}`,
+      params
+    );
+    const total = countResult[0].total;
+
+    // Fetch paginated profiles
+    const [profiles] = await connection.execute(
+      `SELECT * FROM user_profiles ${whereClause} ORDER BY id DESC LIMIT ? OFFSET ?`,
+      [...params, parseInt(limit), parseInt(offset)]
+    );
+
+    return { total, page: parseInt(page), limit: parseInt(limit), profiles };
+  } catch (err) {
+    console.error("❌ Error fetching paginated profiles:", err.message);
+    throw new Error("Error fetching profiles: " + err.message);
+  }
+};
 
 const getProfile = async (register_id) => {
   const GET_USER_PROFILE = `SELECT * FROM user_profiles WHERE id = ?`;
@@ -371,6 +404,14 @@ const updateProfile = async (userId, updatedFields) => {
         updatedFields[field] === "1" ||
         updatedFields[field] === 1;
     }
+
+    // Move the married field logic inside the forEach loop
+    if (field === "married") {
+      updatedFields[field] =
+        updatedFields[field] === "true" ||
+        updatedFields[field] === "1" ||
+        updatedFields[field] === 1;
+    }
   });
 
   // ✅ Build the SQL query dynamically
@@ -410,4 +451,5 @@ module.exports = {
   updateProfile,
   addUserInterests,
   getQuickSearch,
+  getProfilesPaginated,
 };
