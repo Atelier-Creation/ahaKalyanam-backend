@@ -50,13 +50,16 @@ router.post("/login", (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res.status(400).send({ error: "Name and email are required" });
+    return res.status(400).send({ error: "Email and password are required" });
   }
+
   loginCheck(email, password)
     .then((result) => {
-      res.status(200).send({ message: result });
+      // ✅ Use the status returned by loginCheck (200, 401, 500)
+      res.status(result.status).send({ message: result });
     })
     .catch((err) => {
+      console.error("❌ Login route error:", err.message);
       res.status(500).send({ error: err.message });
     });
 });
@@ -274,6 +277,7 @@ router.post(
         other_details,
         dasa_balance,
         horoscope,
+        married,
       } = cleanedBody;
 
       const age = parseInt(cleanedBody.age) || null;
@@ -304,17 +308,20 @@ router.post(
       }
 
       const query = `
-        INSERT INTO user_profiles (
-          name, age, gender, city, date_of_birth, time_of_birth, place,
-          father_name, mother_name, father_job, mother_job, no_of_siblings, siblings_marital_status,
-          marital_status, mother_tongue, height, weight, blood_group, diet, disability, complexion,
-          caste, sub_caste, religion, gowthram, star, raasi, padam, laknam, job, place_of_job, income_per_month,
-          qualification, permanent_address, present_address, contact_person, contact_number,
-          partner_qualification, partner_job, partner_job_availability, partner_income,
-          preferred_age, partner_diet, horoscope_required, partner_marital_status, partner_caste,
-          partner_sub_caste, image_1, image_2, created_by, linked_to,
-          other_details, horoscope, dasa_balance, other_assets, own_house
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+INSERT INTO user_profiles (
+  name, age, gender, city, date_of_birth, time_of_birth, place,
+  father_name, mother_name, father_job, mother_job, no_of_siblings, siblings_marital_status,
+  marital_status, mother_tongue, height, weight, blood_group, diet, disability, complexion,
+  caste, religion, sub_caste, gowthram, star, raasi, padam, laknam,
+  job, place_of_job, income_per_month, qualification, permanent_address, present_address,
+  contact_person, contact_number, partner_qualification, partner_job, partner_job_availability,
+  partner_income, preferred_age, partner_diet, horoscope_required, partner_marital_status,
+  partner_caste, partner_sub_caste, image_1, image_2, created_by, linked_to,
+  other_details, horoscope, dasa_balance, other_assets, own_house, married
+) VALUES (
+  ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+);
+`.trim();
 
       const values = [
         safeValue(name),
@@ -373,6 +380,7 @@ router.post(
         safeValue(dasa_balance),
         safeValue(other_assets),
         safeValue(own_house),
+        safeValue(married),
       ];
 
       const [result] = await connection.execute(query, values);
@@ -381,7 +389,13 @@ router.post(
       res.json({ success: true, status: 200, data: { id: result.insertId } });
     } catch (error) {
       console.error(error);
-      res.status(500).json({ success: false, message: "Error saving data" });
+      res
+        .status(500)
+        .json({
+          success: false,
+          message: "Error saving data",
+          error: error.message,
+        });
     }
   }
 );
@@ -400,17 +414,21 @@ router.post(
       });
     }
 
+    console.log(`🔄 Password reset requested for email: ${mail_id}`);
+
     // Hash the new password
     bcrypt
       .hash(new_password, 10)
       .then((hashedPassword) => {
+        console.log(`🔐 New hash prefix for ${mail_id}: ${hashedPassword.slice(0, 7)}`);
         return resetUserPassword(mail_id, hashedPassword);
       })
       .then((response) => {
+        console.log(`✅ Password reset successful for: ${mail_id}`);
         res.status(200).json(response);
       })
       .catch((error) => {
-        console.error("Reset password error:", error);
+        console.error("❌ Reset password error:", error);
         res.status(500).json(error);
       });
   }
@@ -610,7 +628,6 @@ router.delete(
     }
   }
 );
-
 
 router.post("/add-interests", authenticateToken, async (req, res) => {
   const { user_id, liked_profile_id } = req.body;
@@ -834,13 +851,13 @@ router.get("/quick_search", async (req, res) => {
   } = req.query;
 
   const filters = {
-    gender: gender === "" ? null : gender,
-    min_age: min_age === "" ? null : parseInt(min_age),
-    max_age: max_age === "" ? null : parseInt(max_age),
-    religion: religion === "" ? null : religion,
-    caste: caste === "" ? null : caste,
-    sub_caste: sub_caste === "" ? null : sub_caste,
-    marital_status: marital_status === "" ? null : marital_status,
+    gender: gender || null,
+    min_age: min_age ? parseInt(min_age) : null,
+    max_age: max_age ? parseInt(max_age) : null,
+    religion: religion || null,
+    caste: caste || null,
+    sub_caste: sub_caste || null,
+    marital_status: marital_status || null,
   };
 
   console.log("Filters:", filters); // Log the filters to see what is being passed

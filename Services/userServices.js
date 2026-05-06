@@ -106,13 +106,22 @@ const loginCheck = async (email, password) => {
     const [results] = await connection.execute(LOGIN_USER, [email]);
 
     if (results.length === 0) {
+      console.warn(`⚠️  Login failed — no user found for email: ${email}`);
       return { status: 401, error: "Invalid email or account deactivated" };
+    }
+
+    // ⚠️ If duplicates exist, warn in logs (should not happen after the createUser fix)
+    if (results.length > 1) {
+      console.error(`❌ DUPLICATE USERS DETECTED for email: ${email} (count: ${results.length}). Fix the database!`);
     }
 
     const user = results[0];
 
+    console.log(`🔐 Login attempt for: ${email} | Stored hash prefix: ${user.password?.slice(0, 7)}`);
+
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
+      console.warn(`⚠️  Password mismatch for email: ${email}`);
       return { status: 401, error: "Invalid email or password" };
     }
 
@@ -122,6 +131,7 @@ const loginCheck = async (email, password) => {
       { expiresIn: "6h" }
     );
 
+    console.log(`✅ Login successful for: ${email} | role: ${user.role}`);
     return {
       status: 200,
       message: "Login successful",
@@ -136,6 +146,7 @@ const loginCheck = async (email, password) => {
 const createUser = async (name, email, phone, password, gender) => {
   const role = gender === "Female" ? "moderator" : "user";
 
+  const CHECK_EMAIL = `SELECT id FROM users WHERE mail_id = ? LIMIT 1`;
   const CREATE_USER = `
     INSERT INTO users (name, mail_id, password, phone, register_number, gender, role)
     VALUES (?, ?, ?, ?, 
@@ -146,6 +157,13 @@ const createUser = async (name, email, phone, password, gender) => {
   const SELECT_USER = `SELECT * FROM users WHERE mail_id = ?`;
 
   try {
+    // ✅ Block duplicate registrations — root cause of login-after-reset bug
+    const [existing] = await connection.execute(CHECK_EMAIL, [email]);
+    if (existing.length > 0) {
+      console.warn(`⚠️  Duplicate registration attempt for email: ${email}`);
+      throw new Error("A user with this email already exists.");
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const [result] = await connection.execute(CREATE_USER, [
@@ -214,9 +232,9 @@ const getProfilesPaginated = async (page = 1, limit = 10, search = "") => {
 
     if (search) {
       // Search across multiple columns
-      whereClause = `WHERE name LIKE ? OR caste LIKE ? OR gender LIKE ? OR contact_number LIKE ?`;
+      whereClause = `WHERE  CAST(id AS CHAR) LIKE ? OR name LIKE ? OR caste LIKE ? OR gender LIKE ? OR contact_number LIKE ?`;
       const searchTerm = `%${search}%`;
-      params.push(searchTerm, searchTerm, searchTerm, searchTerm);
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
     // Fetch total count (with search applied if any)
@@ -384,9 +402,14 @@ const updateProfile = async (userId, updatedFields) => {
 
     // Convert empty strings for numeric fields to null
     if (
-      ["income_per_month", "partner_income", "weight", "age", "height", "no_of_siblings"].includes(
-        field
-      ) &&
+      [
+        "income_per_month",
+        "partner_income",
+        "weight",
+        "age",
+        "height",
+        "no_of_siblings",
+      ].includes(field) &&
       updatedFields[field] === ""
     ) {
       updatedFields[field] = null;
@@ -400,17 +423,7 @@ const updateProfile = async (userId, updatedFields) => {
     // Convert 'true'/'false' string to boolean
     if (field === "married") {
       updatedFields[field] =
-        updatedFields[field] === "true" ||
-        updatedFields[field] === "1" ||
-        updatedFields[field] === 1;
-    }
-
-    // Move the married field logic inside the forEach loop
-    if (field === "married") {
-      updatedFields[field] =
-        updatedFields[field] === "true" ||
-        updatedFields[field] === "1" ||
-        updatedFields[field] === 1;
+        updatedFields[field] === 1 || updatedFields[field] === "1" ? 1 : 0;
     }
   });
 
@@ -437,7 +450,6 @@ const updateProfile = async (userId, updatedFields) => {
     throw new Error("Error updating user profile: " + error.message);
   }
 };
-
 
 module.exports = {
   updateUserDetails,
