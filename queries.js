@@ -57,7 +57,9 @@ const CREATE_USER_TABLE = `CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(255) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,  -- Store hashed passwords
-    role ENUM('user', 'admin') NOT NULL DEFAULT 'user'
+    role ENUM('user', 'admin', 'moderator') NOT NULL DEFAULT 'user',
+    is_demo BOOLEAN DEFAULT 0,
+    expiry_date DATETIME DEFAULT NULL
 );`
 
 

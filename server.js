@@ -1,12 +1,12 @@
 // server.js
 const express = require('express');
 const bodyParser = require('body-parser');
- const routes = require('./routes'); // Import routes from controller.js
+const routes = require('./routes'); // Import routes from controller.js
 require('dotenv').config();
 const cors = require("cors");
 const path = require('path');
 
- const port = process.env.PORT || 3000;
+const port = process.env.PORT || 3000;
 
 
 const app = express();
@@ -23,10 +23,10 @@ app.use('/uploads', express.static(uploadsDir, {
 }));
 // Middleware to parse JSON bodies
 app.use(bodyParser.json());
-app.use(express.json()); 
+app.use(express.json());
 
 // Use the routes defined in routes.js
-app.use('/api', routes); 
+app.use('/api', routes);
 
 // Start the server
 

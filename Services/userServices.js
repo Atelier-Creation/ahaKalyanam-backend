@@ -119,6 +119,16 @@ const loginCheck = async (email, password) => {
 
     console.log(`🔐 Login attempt for: ${email} | Stored hash prefix: ${user.password?.slice(0, 7)}`);
 
+    // ✅ Check if demo account has expired
+    if (user.is_demo && user.expiry_date) {
+      const now = new Date();
+      const expiry = new Date(user.expiry_date);
+      if (now > expiry) {
+        console.warn(`⚠️  Demo access expired for email: ${email}`);
+        return { status: 403, error: "Demo access has expired. Please contact support." };
+      }
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       console.warn(`⚠️  Password mismatch for email: ${email}`);

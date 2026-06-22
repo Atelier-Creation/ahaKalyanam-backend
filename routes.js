@@ -40,6 +40,7 @@ const {
   getQuickSearch,
   getProfileById,
 } = require("./Services/userServices");
+const { generateDemoUser } = require("./Services/demoService");
 const { authenticateToken, authorizeRoles } = require("./Auth/middleware");
 require("dotenv").config();
 
@@ -60,6 +61,22 @@ router.post("/login", (req, res) => {
     })
     .catch((err) => {
       console.error("❌ Login route error:", err.message);
+      res.status(500).send({ error: err.message });
+    });
+});
+router.post("/generate-demo", (req, res) => {
+  const { name, email, phone } = req.body;
+
+  if (!email || !name || !phone) {
+    return res.status(400).send({ error: "Name, email and phone are required" });
+  }
+
+  generateDemoUser(name, email, phone)
+    .then((result) => {
+      res.status(200).send(result);
+    })
+    .catch((err) => {
+      console.error("❌ Demo generation error:", err.message);
       res.status(500).send({ error: err.message });
     });
 });
