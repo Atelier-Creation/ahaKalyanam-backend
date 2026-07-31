@@ -37,6 +37,7 @@ const {
   updateProfile,
   addUserInterests,
   getProfilesPaginated,
+  getRegistrationCounts,
   getQuickSearch,
   getProfileById,
 } = require("./Services/userServices");
@@ -363,8 +364,8 @@ INSERT INTO user_profiles (
         safeValue(disability),
         safeValue(complexion),
         safeValue(caste),
-        safeValue(sub_caste),
         safeValue(religion),
+        safeValue(sub_caste),
         safeValue(gowthram),
         safeValue(star),
         safeValue(raasi),
@@ -580,6 +581,24 @@ router.get("/allprofiles", async (req, res) => {
     res.status(200).json({ message: result });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+router.get("/registration-counts", async (req, res) => {
+  try {
+    const result = await getRegistrationCounts();
+
+    res.status(200).json({
+      status: 200,
+      message: "Registration counts fetched successfully",
+      data: result,
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: 500,
+      message: "Error fetching registration counts",
+      error: err.message,
+    });
   }
 });
 

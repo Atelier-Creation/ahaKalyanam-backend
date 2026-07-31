@@ -218,7 +218,7 @@ const createUser = async (name, email, phone, password, gender) => {
 };
 
 const getAllProfile = async () => {
-  const GET_ALL_USERS = `SELECT * FROM user_profiles;`;
+  const GET_ALL_USERS = `SELECT * FROM user_profiles ORDER BY RAND();`;
 
   try {
     const [users] = await connection.execute(GET_ALL_USERS); // Using await with execute
@@ -233,6 +233,43 @@ const getAllProfile = async () => {
     throw new Error("Error fetching users: " + err.message);
   }
 };
+
+const getRegistrationCounts = async () => {
+  const GET_REGISTRATION_COUNTS = `
+    SELECT
+      COUNT(*) AS total,
+      SUM(CASE WHEN LOWER(TRIM(COALESCE(gender, ''))) = 'male' THEN 1 ELSE 0 END) AS male,
+      SUM(CASE WHEN LOWER(TRIM(COALESCE(gender, ''))) = 'female' THEN 1 ELSE 0 END) AS female,
+      SUM(CASE
+        WHEN LOWER(TRIM(COALESCE(gender, ''))) = 'male'
+          AND LOWER(TRIM(COALESCE(CAST(married AS CHAR), ''))) IN ('1', 'true', 'yes')
+        THEN 1 ELSE 0
+      END) AS marriedMale,
+      SUM(CASE
+        WHEN LOWER(TRIM(COALESCE(gender, ''))) = 'female'
+          AND LOWER(TRIM(COALESCE(CAST(married AS CHAR), ''))) IN ('1', 'true', 'yes')
+        THEN 1 ELSE 0
+      END) AS marriedFemale
+    FROM user_profiles;
+  `;
+
+  try {
+    const [rows] = await connection.execute(GET_REGISTRATION_COUNTS);
+    const counts = rows[0] || {};
+
+    return {
+      total: Number(counts.total) || 0,
+      male: Number(counts.male) || 0,
+      female: Number(counts.female) || 0,
+      marriedMale: Number(counts.marriedMale) || 0,
+      marriedFemale: Number(counts.marriedFemale) || 0,
+    };
+  } catch (err) {
+    console.error("Error fetching registration counts:", err.message);
+    throw new Error("Error fetching registration counts: " + err.message);
+  }
+};
+
 const getProfilesPaginated = async (page = 1, limit = 10, search = "") => {
   const offset = (page - 1) * limit;
 
@@ -468,6 +505,7 @@ module.exports = {
   getProfileById,
   resetUserPassword,
   getAllProfile,
+  getRegistrationCounts,
   getProfile,
   getViewProfile,
   updateProfile,

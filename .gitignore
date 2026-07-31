@@ -3,7 +3,9 @@ node_modules/
 
 # Environment variables
 .env
-
+id_rsa
+id_rsa.*
+*.pem
 # Logs
 npm-debug.log*
 yarn-debug.log*

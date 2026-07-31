@@ -4,6 +4,7 @@ require("dotenv").config();
 // Create a Promise-based pool
 const connection = mysql.createPool({
   host: process.env.DB_HOST || "139.59.56.128",
+  port: Number(process.env.DB_PORT) || 3306,
   user: process.env.DB_USER || "ahamat",
   password: process.env.DB_PASS || "AtelierCreation@2019A",
   database: process.env.DB_NAME || "ahamat",
@@ -30,7 +31,7 @@ const handleReconnect = async (retries, delay) => {
 
       if (attempts >= retries - 1) {
         console.error('Max retries reached, unable to connect to the database.');
-        process.exit(1); // Exit if max retries are reached
+        return;
       }
 
       // Retry after delay
