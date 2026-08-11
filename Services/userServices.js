@@ -238,35 +238,130 @@ const getRegistrationCounts = async () => {
   const GET_REGISTRATION_COUNTS = `
     SELECT
       COUNT(*) AS total,
-      SUM(CASE WHEN LOWER(TRIM(COALESCE(gender, ''))) = 'male' THEN 1 ELSE 0 END) AS male,
-      SUM(CASE WHEN LOWER(TRIM(COALESCE(gender, ''))) = 'female' THEN 1 ELSE 0 END) AS female,
-      SUM(CASE
-        WHEN LOWER(TRIM(COALESCE(gender, ''))) = 'male'
-          AND LOWER(TRIM(COALESCE(CAST(married AS CHAR), ''))) IN ('1', 'true', 'yes')
-        THEN 1 ELSE 0
-      END) AS marriedMale,
-      SUM(CASE
-        WHEN LOWER(TRIM(COALESCE(gender, ''))) = 'female'
-          AND LOWER(TRIM(COALESCE(CAST(married AS CHAR), ''))) IN ('1', 'true', 'yes')
-        THEN 1 ELSE 0
-      END) AS marriedFemale
+
+      SUM(
+        CASE 
+          WHEN LOWER(TRIM(COALESCE(gender, ''))) = 'male'
+          THEN 1 ELSE 0 
+        END
+      ) AS male,
+
+      SUM(
+        CASE 
+          WHEN LOWER(TRIM(COALESCE(gender, ''))) = 'female'
+          THEN 1 ELSE 0 
+        END
+      ) AS female,
+
+      SUM(
+        CASE
+          WHEN LOWER(TRIM(COALESCE(gender, ''))) = 'male'
+            AND LOWER(TRIM(COALESCE(CAST(married AS CHAR), '')))
+                IN ('1', 'true', 'yes')
+          THEN 1 ELSE 0
+        END
+      ) AS marriedMale,
+
+      SUM(
+        CASE
+          WHEN LOWER(TRIM(COALESCE(gender, ''))) = 'female'
+            AND LOWER(TRIM(COALESCE(CAST(married AS CHAR), '')))
+                IN ('1', 'true', 'yes')
+          THEN 1 ELSE 0
+        END
+      ) AS marriedFemale,
+
+      -- Remarriage counts based on [மறுமணம் ] suffix in name
+      SUM(
+        CASE
+          WHEN LOWER(TRIM(COALESCE(gender, ''))) = 'male'
+            AND COALESCE(name, '') LIKE '%[மறுமணம் %'
+          THEN 1 ELSE 0
+        END
+      ) AS remarriageMale,
+
+      SUM(
+        CASE
+          WHEN LOWER(TRIM(COALESCE(gender, ''))) = 'female'
+            AND COALESCE(name, '') LIKE '%[மறுமணம் %'
+          THEN 1 ELSE 0
+        END
+      ) AS remarriageFemale
+
     FROM user_profiles;
   `;
 
+
+  const GET_CASTE_COUNTS = `
+    SELECT
+      TRIM(caste) AS caste,
+
+      COUNT(*) AS total,
+
+      SUM(
+        CASE
+          WHEN LOWER(TRIM(COALESCE(gender, ''))) = 'male'
+          THEN 1 ELSE 0
+        END
+      ) AS male,
+
+      SUM(
+        CASE
+          WHEN LOWER(TRIM(COALESCE(gender, ''))) = 'female'
+          THEN 1 ELSE 0
+        END
+      ) AS female
+
+    FROM user_profiles
+
+    WHERE caste IS NOT NULL
+      AND TRIM(caste) != ''
+
+    GROUP BY TRIM(caste)
+
+    ORDER BY total DESC, caste ASC;
+  `;
+
   try {
-    const [rows] = await connection.execute(GET_REGISTRATION_COUNTS);
+    const [rows] = await connection.execute(
+      GET_REGISTRATION_COUNTS
+    );
+
+    const [casteRows] = await connection.execute(
+      GET_CASTE_COUNTS
+    );
+
     const counts = rows[0] || {};
 
     return {
       total: Number(counts.total) || 0,
+
       male: Number(counts.male) || 0,
       female: Number(counts.female) || 0,
+
       marriedMale: Number(counts.marriedMale) || 0,
       marriedFemale: Number(counts.marriedFemale) || 0,
+
+      remarriageMale: Number(counts.remarriageMale) || 0,
+      remarriageFemale: Number(counts.remarriageFemale) || 0,
+
+      castes: casteRows.map((row) => ({
+        caste: row.caste,
+        total: Number(row.total) || 0,
+        male: Number(row.male) || 0,
+        female: Number(row.female) || 0,
+      })),
     };
+
   } catch (err) {
-    console.error("Error fetching registration counts:", err.message);
-    throw new Error("Error fetching registration counts: " + err.message);
+    console.error(
+      "Error fetching registration counts:",
+      err.message
+    );
+
+    throw new Error(
+      "Error fetching registration counts: " + err.message
+    );
   }
 };
 

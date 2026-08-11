@@ -683,6 +683,15 @@ router.get("/profile/:id", async (req, res) => {
 
   try {
     const result = await getProfile(id); // Call the function to fetch the profile
+    
+    // Security check: Block access if the profile is married
+    if (result && (result.married === 1 || parseInt(result.married) === 1)) {
+      return res.status(403).json({
+        status: 403,
+        error: "This profile is happily married and no longer publicly viewable.",
+      });
+    }
+
     res.status(200).json({
       status: 200,
       message: "Profile fetched successfully",
